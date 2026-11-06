@@ -1,0 +1,205 @@
+{
+  "generado": "2026-11-06 09:00",
+  "fuente": "ODBC DSN=Colineal / ctin_produccion",
+  "definicion_consumo": "misma definicion que el tablero de Salud del inventario (_consumo_comun.py): cuenta cliente, produccion; NO cuentan devolucion, otro, traslado",
+  "consumo_estimado_mes_en_curso": 51,
+  "dias_del_mes_en_curso": 6,
+  "excel_rotacion": {
+    "archivo": "rotacion inventarios 2026.xlsx",
+    "fecha": "2026-08-21",
+    "dias": 77,
+    "umbral": 15,
+    "vencido": false,
+    "historico_cerrado": true
+  },
+  "meses": [
+    "ENE 2026",
+    "FEB 2026",
+    "MAR 2026",
+    "ABR 2026",
+    "MAY 2026",
+    "JUN 2026",
+    "JUL 2026",
+    "AGO 2026",
+    "SEP 2026",
+    "OCT 2026",
+    "NOV 2026"
+  ],
+  "n_meses": 10,
+  "meses_disponibles": [
+    "ENE 2026",
+    "FEB 2026",
+    "MAR 2026",
+    "ABR 2026",
+    "MAY 2026",
+    "JUN 2026",
+    "JUL 2026",
+    "AGO 2026",
+    "SEP 2026",
+    "OCT 2026",
+    "NOV 2026"
+  ],
+  "mes_excluido_por_incompleto": "NOV 2026",
+  "items": 9340,
+  "almacenes": 34,
+  "stock_total": 3951903.53,
+  "consumo_total": 20454966.8,
+  "rotacion": 6.21,
+  "dias": 59,
+  "inmovilizado": 1639977.98,
+  "inmovilizado_items": 3859,
+  "items_sin_costo": 913,
+  "excluido_por_tipo": {
+    "traslado": 15011564.28,
+    "ajuste": 4218441.7,
+    "devolucion": 135443.31
+  },
+  "por_planta": [
+    {
+      "planta": "MP CTIN",
+      "valor": 2011356
+    },
+    {
+      "planta": "MP ZHULLIN",
+      "valor": 628407
+    },
+    {
+      "planta": "HR HERRAMIENTAS Y REPUESTOS",
+      "valor": 417078
+    },
+    {
+      "planta": "MP PATAMARCA",
+      "valor": 376121
+    },
+    {
+      "planta": "MP MAESTRO",
+      "valor": 107427
+    },
+    {
+      "planta": "PLANTA TAPIZADO",
+      "valor": 106646
+    },
+    {
+      "planta": "PLANTA SE MADERAS",
+      "valor": 33892
+    },
+    {
+      "planta": "PLANTA LENCERIA",
+      "valor": 26669
+    },
+    {
+      "planta": "PLANTA CAJON",
+      "valor": 21794
+    },
+    {
+      "planta": "PLANTA FORMACION ESPUMAS",
+      "valor": 20724
+    },
+    {
+      "planta": "LIQUIDACION",
+      "valor": 18876
+    },
+    {
+      "planta": "PLANTA SE ESPUMAS",
+      "valor": 18543
+    },
+    {
+      "planta": "PT CTIN",
+      "valor": 16769
+    },
+    {
+      "planta": "PT PIN",
+      "valor": 15485
+    },
+    {
+      "planta": "PT PROTOTIPOS",
+      "valor": 15065
+    },
+    {
+      "planta": "MP SIN MOVIMIENTO",
+      "valor": 13968
+    },
+    {
+      "planta": "PT ZHULLIN",
+      "valor": 13462
+    },
+    {
+      "planta": "PLANTA SE FERROTECNIA",
+      "valor": 11677
+    },
+    {
+      "planta": "SE CORTE Y COSTURA",
+      "valor": 10606
+    },
+    {
+      "planta": "PLANTA SE CORTE Y COSTURA",
+      "valor": 8893
+    },
+    {
+      "planta": "SE PATAS TAPIZADO",
+      "valor": 8789
+    },
+    {
+      "planta": "Virtual Locations",
+      "valor": 8742
+    },
+    {
+      "planta": "PLANTA COLCHONES",
+      "valor": 7748
+    },
+    {
+      "planta": "PLANTA DORMITORIOS",
+      "valor": 7506
+    },
+    {
+      "planta": "PLANTA SE TABLEROS",
+      "valor": 7415
+    },
+    {
+      "planta": "SE FERROTECNIA",
+      "valor": 6670
+    },
+    {
+      "planta": "PLANTA SILLONERIA",
+      "valor": 4199
+    },
+    {
+      "planta": "SE MADERAS",
+      "valor": 2966
+    },
+    {
+      "planta": "SE ESPUMAS",
+      "valor": 1874
+    },
+    {
+      "planta": "PLANTA DE REPARACIONES PIN",
+      "valor": 980
+    },
+    {
+      "planta": "PLANTA PROTOTIPOS TAPIZADO",
+      "valor": 927
+    },
+    {
+      "planta": "PLANTA SE TABLEROS TAPIZADO",
+      "valor": 356
+    },
+    {
+      "planta": "PLANTA DE REPARACIONES ZHULLIN",
+      "valor": 243
+    },
+    {
+      "planta": "SUMINISTROS ADMINISTRATIVOS",
+      "valor": 29
+    }
+  ],
+  "comparacion": {
+    "items_antes": 5242,
+    "items_ahora": 9340,
+    "comunes": 5198,
+    "solo_antes": 44,
+    "solo_ahora": 4142,
+    "stock_antes": 3722303.0,
+    "stock_ahora": 3951903.53,
+    "cambios_clasificacion": 3478
+  }
+}
