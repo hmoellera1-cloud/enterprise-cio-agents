@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: ctin-cio-agents
+    env: docker
+    plan: free
+    dockerfilePath: Dockerfile
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: ENTERPRISE_DB_PATH
+        value: /app/enterprise.db
