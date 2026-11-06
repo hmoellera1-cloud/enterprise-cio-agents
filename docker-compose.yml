@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  cio-multiagent-api:
+    build: .
+    container_name: enterprise_cio_agents
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONPATH=/app/src
+      - ENTERPRISE_DB_PATH=/app/data/enterprise.db
+      - PORT=8000
+    volumes:
+      - enterprise_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  enterprise_data:
