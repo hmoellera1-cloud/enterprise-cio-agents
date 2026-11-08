@@ -63,8 +63,15 @@ Tus respuestas son concisas, estructuradas y con enfoque en métricas y cumplimi
         extracted_keyword = " ".join(candidate_tokens).strip()
 
         # Análisis semántico de la consulta
-        if is_search and extracted_keyword:
-            result = self.call_tool("search_product_sales", keyword=extracted_keyword, month=found_month)
+        # 1. Búsqueda de producto si hay término identificado y no es un pedido de KPI global
+        product_result = None
+        if extracted_keyword and not any(w in q for w in ["kpi", "resumen general", "facturacion total", "pipeline"]):
+            res = self.call_tool("search_product_sales", keyword=extracted_keyword, month=found_month)
+            if res.get("total_units_sold", 0) > 0 or is_search:
+                product_result = res
+
+        if product_result:
+            result = product_result
             period_str = f"en {found_month.capitalize()}" if found_month else "en el período registrado de CTIN"
 
             if result["total_units_sold"] > 0:
