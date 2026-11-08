@@ -214,7 +214,11 @@ Tu misión es integrar la visión estratégica corporativa con los datos operati
                 recommendations=inv_res.recommendations
             )
 
-        elif any(w in q for w in ["venta", "comercial", "ingreso", "facturacion", "cliente", "pedido"]):
+        elif any(w in q for w in [
+            "venta", "comercial", "ingreso", "facturacion", "facturación", "cliente", "pedido",
+            "cuantas", "cuantos", "cuanta", "cuanto", "cuántas", "cuántos", "cuánta", "cuánto",
+            "vendieron", "vendio", "vendió", "westin"
+        ]):
             # Delegar al subagente de ventas y sintetizar
             sales_res = self.sales_agent.handle_request(user_query, context)
             summary = f"[CIO -> Agente de Ventas]: {sales_res.summary}"
