@@ -215,9 +215,10 @@ Tu misión es integrar la visión estratégica corporativa con los datos operati
             )
 
         elif any(w in q for w in [
-            "venta", "comercial", "ingreso", "facturacion", "facturación", "cliente", "pedido",
+            "venta", "ventas", "comercial", "ingreso", "facturacion", "facturación", "cliente", "pedido",
             "cuantas", "cuantos", "cuanta", "cuanto", "cuántas", "cuántos", "cuánta", "cuánto",
-            "vendieron", "vendio", "vendió", "westin"
+            "vendieron", "vendio", "vendió", "westin", "bombay", "sala", "salas", "sofa", "sofas",
+            "comedor", "comedores", "mesa", "mesas", "cama", "camas", "mueble", "muebles", "producto", "productos"
         ]):
             # Delegar al subagente de ventas y sintetizar
             sales_res = self.sales_agent.handle_request(user_query, context)
@@ -231,22 +232,33 @@ Tu misión es integrar la visión estratégica corporativa con los datos operati
             )
 
         else:
-            # Respuesta holística del CIO
-            briefing = self.generate_executive_briefing()
-            summary = (
-                f"Director de Información (CIO - CTIN): Supervisando operaciones activas. "
-                f"Ingresos totales registrados: ${briefing.sales_kpis.get('total_revenue', 0):,} en {briefing.sales_kpis.get('total_orders', 0)} órdenes. "
-                f"Existencias físicas: {briefing.inventory_kpis.get('total_units_on_hand', 0)} unidades. "
-                f"Alertas de riesgo cruzado activas: {len(briefing.cross_functional_alerts)}."
-            )
-            resp = AgentResponse(
-
-                agent_name=self.name,
-                status="success",
-                summary=summary,
-                details={"briefing": briefing.dict()},
-                recommendations=briefing.strategic_initiatives
-            )
+            # Primero intentar evaluar si es una consulta sobre algún producto en ventas
+            sales_res = self.sales_agent.handle_request(user_query, context)
+            if sales_res.details.get("search_result", {}).get("total_units_sold", 0) > 0:
+                summary = f"[CIO -> Agente de Ventas]: {sales_res.summary}"
+                resp = AgentResponse(
+                    agent_name=self.name,
+                    status=sales_res.status,
+                    summary=summary,
+                    details={"delegated_to": self.sales_agent.name, "response": sales_res.dict()},
+                    recommendations=sales_res.recommendations
+                )
+            else:
+                # Respuesta holística del CIO
+                briefing = self.generate_executive_briefing()
+                summary = (
+                    f"Director de Información (CIO - CTIN): Supervisando operaciones activas. "
+                    f"Ingresos totales registrados: ${briefing.sales_kpis.get('total_revenue', 0):,} en {briefing.sales_kpis.get('total_orders', 0)} órdenes. "
+                    f"Existencias físicas: {briefing.inventory_kpis.get('total_units_on_hand', 0)} unidades. "
+                    f"Alertas de riesgo cruzado activas: {len(briefing.cross_functional_alerts)}."
+                )
+                resp = AgentResponse(
+                    agent_name=self.name,
+                    status="success",
+                    summary=summary,
+                    details={"briefing": briefing.dict()},
+                    recommendations=briefing.strategic_initiatives
+                )
 
         self.log_message(sender=self.name, recipient="DirectorGeneral", content=resp.summary)
         return resp
