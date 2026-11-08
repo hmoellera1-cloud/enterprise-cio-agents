@@ -13,15 +13,23 @@ class TestWhatsAppIntegration(unittest.TestCase):
     def test_process_whatsapp_sales_query(self):
         msg = "¿Cuál es el resumen de ventas?"
         response = process_whatsapp_message(msg)
-        self.assertIn("Director de Información (CIO)", response)
+        self.assertIn("Director de Información (CIO - CTIN)", response)
         self.assertIn("Facturación Total", response)
         self.assertIn("Recomendaciones Estratégicas", response)
 
     def test_process_whatsapp_inventory_query(self):
         msg = "Alerta de stock crítico"
         response = process_whatsapp_message(msg)
-        self.assertIn("Director de Información (CIO)", response)
+        self.assertIn("Director de Información (CIO - CTIN)", response)
         self.assertTrue("Auditoría de Almacén" in response or "almacén" in response.lower())
+
+    def test_process_whatsapp_product_search(self):
+        msg = "¿Cuántas salas westin se vendieron en octubre?"
+        response = process_whatsapp_message(msg)
+        self.assertIn("Director de Información (CIO - CTIN)", response)
+        self.assertIn("98 unidades", response)
+        self.assertIn("USD", response)
+
 
     def test_generate_twiml_xml(self):
         body = "Hola CIO *negrita*"
