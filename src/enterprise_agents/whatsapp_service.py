@@ -16,12 +16,6 @@ def format_whatsapp_response(raw_text: str, recommendations: list = None) -> str
     """Da formato amigable con negritas y emojis optimizados para la pantalla de WhatsApp."""
     clean_text = raw_text.replace("€", "$")
     formatted = f"👔 *Director de Información (CIO - CTIN)*\n\n{clean_text}"
-    
-    if recommendations:
-        formatted += "\n\n📌 *Recomendaciones Estratégicas:*"
-        for r in recommendations:
-            formatted += f"\n• {r}"
-            
     formatted += "\n\n_— Sistema Multi-Agente Empresarial CTIN_"
     return formatted
 
