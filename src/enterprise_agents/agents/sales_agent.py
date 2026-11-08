@@ -31,13 +31,67 @@ Tus respuestas son concisas, estructuradas y con enfoque en métricas y cumplimi
         self.register_tool(sales_tools.get_sales_by_category, "get_sales_by_category")
         self.register_tool(sales_tools.get_recent_orders, "get_recent_orders")
         self.register_tool(sales_tools.get_sales_pipeline_insights, "get_sales_pipeline_insights")
+        self.register_tool(sales_tools.search_product_sales, "search_product_sales")
 
     def handle_request(self, user_query: str, context: Optional[Dict[str, Any]] = None) -> AgentResponse:
         self.log_message(sender="UserOrCIO", recipient=self.name, content=user_query)
         q = user_query.lower()
 
+        # Detección de mes si aplica
+        months = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+        found_month = next((m for m in months if m in q), None)
+
+        # Palabras de búsqueda de producto específico
+        search_indicators = [
+            "cuantas", "cuantos", "cuanta", "cuanto", "cuántas", "cuántos", "cuánta", "cuánto",
+            "vendieron", "vendio", "vendió", "buscar", "modelo", "westin"
+        ]
+        is_search = any(w in q for w in search_indicators) or ("venta de " in q or "ventas de " in q)
+
+        stopwords = {
+            "cuantas", "cuantos", "cuanta", "cuanto", "cuántas", "cuántos", "cuánta", "cuánto",
+            "se", "vendieron", "vendio", "vendió", "en", "el", "la", "los", "las",
+            "un", "una", "unos", "unas", "de", "del", "por", "favor", "dime", "diga", "mes", "ano", "año", "para",
+            "total", "sobre", "ventas", "venta", "pedidos", "ordenes", "órdenes", "informacion", "información",
+            "hay", "buscar", "modelo"
+        }
+        if found_month:
+            stopwords.add(found_month)
+
+        clean_text = "".join(ch if ch.isalnum() or ch.isspace() else " " for ch in q)
+        candidate_tokens = [w for w in clean_text.split() if w not in stopwords]
+        extracted_keyword = " ".join(candidate_tokens).strip()
+
         # Análisis semántico de la consulta
-        if any(w in q for w in ["kpi", "resumen", "total", "ingreso", "facturacion", "general"]):
+        if is_search and extracted_keyword:
+            result = self.call_tool("search_product_sales", keyword=extracted_keyword, month=found_month)
+            period_str = f"en {found_month.capitalize()}" if found_month else "en el período registrado de CTIN"
+
+            if result["total_units_sold"] > 0:
+                summary = (
+                    f"Ventas de '{extracted_keyword}' {period_str}: "
+                    f"Se vendieron un total de {result['total_units_sold']} unidades "
+                    f"por un valor de ${result['total_revenue']:,} USD a través de {result['total_variants']} variantes de producto."
+                )
+                recs = [
+                    f"Variante líder: '{result['variants'][0]['name']}' ({result['variants'][0]['units_sold']} uds vendidas, ${result['variants'][0]['revenue']:,} USD).",
+                    "Coordinar con el Director de Inventarios para auditar existencias y órdenes de reposición en bodegas."
+                ]
+            else:
+                summary = f"No se registraron ventas para '{extracted_keyword}' {period_str}."
+                recs = [
+                    "Verificar si la denominación exacta o código SKU figura en el catálogo maestro de CTIN."
+                ]
+
+            resp = AgentResponse(
+                agent_name=self.name,
+                status="success",
+                summary=summary,
+                details={"search_result": result},
+                recommendations=recs
+            )
+
+        elif any(w in q for w in ["kpi", "resumen", "total", "ingreso", "facturacion", "general"]):
             kpis = self.call_tool("get_sales_kpis")
             pipeline = self.call_tool("get_sales_pipeline_insights")
             summary = (
