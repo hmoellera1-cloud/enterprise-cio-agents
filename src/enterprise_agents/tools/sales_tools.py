@@ -125,3 +125,88 @@ def get_sales_pipeline_insights() -> Dict[str, Any]:
         "pipeline_health": "STRONG" if pending_revenue > 30000 else "NORMAL",
         "fulfillment_rate_pct": round((kpis["completed_orders"] / max(kpis["total_orders"], 1)) * 100, 1)
     }
+
+
+def search_product_sales(keyword: str, month: Optional[str] = None) -> Dict[str, Any]:
+    """Busca ventas acumuladas de un producto o categoría por palabra clave y opcionalmente por mes."""
+    month_map = {
+        "enero": "-01-", "febrero": "-02-", "marzo": "-03-", "abril": "-04-",
+        "mayo": "-05-", "junio": "-06-", "julio": "-07-", "agosto": "-08-",
+        "septiembre": "-09-", "octubre": "-10-", "noviembre": "-11-", "diciembre": "-12-"
+    }
+
+    date_filter = None
+    if month:
+        m_lower = month.lower().strip()
+        date_filter = f"%{month_map.get(m_lower, f'-{m_lower.zfill(2)}-')}%"
+
+    clean_kw = keyword.lower().strip()
+    words = [w for w in clean_kw.split() if len(w) > 1]
+    norm_words = [w[:-1] if w.endswith('s') and len(w) > 3 else w for w in words]
+    if not norm_words:
+        norm_words = [clean_kw]
+
+    conds = " AND ".join(["(LOWER(p.name) LIKE ? OR LOWER(p.sku) LIKE ?)" for _ in norm_words])
+    params = []
+    for w in norm_words:
+        params.extend([f"%{w}%", f"%{w}%"])
+
+    if date_filter:
+        query = f"""
+            SELECT 
+                p.sku,
+                p.name,
+                SUM(oi.quantity) as total_qty,
+                SUM(oi.subtotal) as total_revenue,
+                AVG(oi.unit_price) as avg_price,
+                COUNT(DISTINCT so.id) as orders_count
+            FROM order_items oi
+            JOIN sales_orders so ON oi.order_id = so.id
+            JOIN products p ON oi.product_id = p.id
+            WHERE {conds}
+              AND so.order_date LIKE ?
+            GROUP BY p.id
+            ORDER BY total_qty DESC
+        """
+        params.append(date_filter)
+        rows = query_db(query, tuple(params))
+    else:
+        query = f"""
+            SELECT 
+                p.sku,
+                p.name,
+                SUM(oi.quantity) as total_qty,
+                SUM(oi.subtotal) as total_revenue,
+                AVG(oi.unit_price) as avg_price,
+                COUNT(DISTINCT so.id) as orders_count
+            FROM order_items oi
+            JOIN sales_orders so ON oi.order_id = so.id
+            JOIN products p ON oi.product_id = p.id
+            WHERE {conds}
+            GROUP BY p.id
+            ORDER BY total_qty DESC
+        """
+        rows = query_db(query, tuple(params))
+
+    total_units = sum(r["total_qty"] for r in rows)
+    total_revenue = sum(r["total_revenue"] for r in rows)
+
+    return {
+        "keyword": keyword,
+        "month": month,
+        "total_units_sold": int(total_units),
+        "total_revenue": round(total_revenue, 2),
+        "total_variants": len(rows),
+        "variants": [
+            {
+                "sku": r["sku"],
+                "name": r["name"],
+                "units_sold": int(r["total_qty"]),
+                "revenue": round(r["total_revenue"], 2),
+                "avg_price": round(r["avg_price"], 2),
+                "orders_count": r["orders_count"]
+            }
+            for r in rows
+        ]
+    }
+
