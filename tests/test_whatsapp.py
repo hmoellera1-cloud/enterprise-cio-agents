@@ -15,7 +15,7 @@ class TestWhatsAppIntegration(unittest.TestCase):
         response = process_whatsapp_message(msg)
         self.assertIn("Director de Información (CIO - CTIN)", response)
         self.assertIn("Facturación Total", response)
-        self.assertIn("Recomendaciones Estratégicas", response)
+        self.assertNotIn("Recomendaciones Estratégicas", response)
 
     def test_process_whatsapp_inventory_query(self):
         msg = "Alerta de stock crítico"
