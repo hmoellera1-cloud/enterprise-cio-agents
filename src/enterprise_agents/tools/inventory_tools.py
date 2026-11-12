@@ -248,6 +248,21 @@ def search_inventory_by_keyword(keyword: str) -> Dict[str, Any]:
     total_available = sum(int(r["available"]) for r in rows)
     total_cost_val = sum((r["on_hand"] or 0) * (r["cost_price"] or 0) for r in rows)
 
+    wh_rows = query_db(f"""
+        SELECT 
+            w.code,
+            w.name as warehouse_name,
+            COALESCE(SUM(i.quantity_on_hand), 0) as on_hand,
+            COALESCE(SUM(i.quantity_on_hand - i.quantity_reserved), 0) as available
+        FROM products p
+        JOIN inventory i ON p.id = i.product_id
+        JOIN warehouses w ON i.warehouse_id = w.id
+        WHERE {conds}
+        GROUP BY w.id
+        HAVING on_hand > 0
+        ORDER BY available DESC
+    """, tuple(params))
+
     return {
         "keyword": keyword,
         "total_variants": len(rows),
@@ -255,6 +270,15 @@ def search_inventory_by_keyword(keyword: str) -> Dict[str, Any]:
         "total_reserved": total_reserved,
         "total_available": total_available,
         "total_cost_valuation": round(total_cost_val, 2),
+        "warehouses": [
+            {
+                "code": w["code"],
+                "name": w["warehouse_name"],
+                "on_hand": int(w["on_hand"]),
+                "available": int(w["available"])
+            }
+            for w in wh_rows
+        ],
         "variants": [
             {
                 "sku": r["sku"],
@@ -270,3 +294,67 @@ def search_inventory_by_keyword(keyword: str) -> Dict[str, Any]:
             for r in rows
         ]
     }
+
+
+def get_warehouses_summary(limit: int = 15) -> Dict[str, Any]:
+    """Obtiene el listado de bodegas/almacenes con su inventario físico y valoración."""
+    rows = query_db("""
+        SELECT 
+            w.code,
+            w.name,
+            w.location,
+            COUNT(DISTINCT i.product_id) as skus_count,
+            COALESCE(SUM(i.quantity_on_hand), 0) as on_hand,
+            COALESCE(SUM(i.quantity_on_hand - i.quantity_reserved), 0) as available,
+            COALESCE(SUM(i.quantity_on_hand * p.cost_price), 0) as cost_val
+        FROM warehouses w
+        LEFT JOIN inventory i ON w.id = i.warehouse_id
+        LEFT JOIN products p ON i.product_id = p.id
+        GROUP BY w.id
+        ORDER BY on_hand DESC
+        LIMIT ?
+    """, (limit,))
+    total_wh = query_db("SELECT COUNT(*) as c FROM warehouses")[0]["c"]
+    return {
+        "total_warehouses": total_wh,
+        "warehouses": [
+            {
+                "sku": r["code"],
+                "name": r["name"],
+                "units_sold": int(r["on_hand"]),
+                "revenue": round(r["cost_val"], 2),
+                "skus_count": int(r["skus_count"]),
+                "available": int(r["available"])
+            }
+            for r in rows
+        ]
+    }
+
+
+def get_out_of_stock_products(limit: int = 15) -> List[Dict[str, Any]]:
+    """Lista los productos sin stock disponible (dando prioridad a los que tienen historial de ventas)."""
+    rows = query_db("""
+        SELECT 
+            p.sku,
+            p.name,
+            p.sale_price,
+            COALESCE(SUM(i.quantity_on_hand), 0) as on_hand,
+            COALESCE(SUM(i.quantity_reserved), 0) as reserved,
+            COALESCE((SELECT SUM(oi.quantity) FROM order_items oi WHERE oi.product_id = p.id), 0) as sold_qty
+        FROM products p
+        LEFT JOIN inventory i ON p.id = i.product_id
+        GROUP BY p.id
+        HAVING (on_hand - reserved) <= 0
+        ORDER BY sold_qty DESC, p.name ASC
+        LIMIT ?
+    """, (limit,))
+    return [
+        {
+            "sku": r["sku"],
+            "name": r["name"],
+            "units_sold": int(r["sold_qty"]),
+            "revenue": round((r["sold_qty"] or 0) * (r["sale_price"] or 0), 2),
+        }
+        for r in rows
+    ]
+
