@@ -171,7 +171,7 @@ Tu misión es integrar la visión estratégica corporativa con los datos operati
         # Ruteo inteligente y síntesis
         if any(w in q for w in ["informe", "reporte", "ejecutivo", "briefing", "estado general", "direccion"]):
             briefing = self.generate_executive_briefing()
-            summary = f"El CIO ha consolidado el Informe Ejecutivo Corporativo al {briefing.generated_at}."
+            summary = f"{briefing.executive_summary}\n\n{briefing.cio_perspective}"
             recs = [alert.recommended_action for alert in briefing.cross_functional_alerts] + briefing.strategic_initiatives[:2]
             resp = AgentResponse(
                 agent_name=self.name,
@@ -202,7 +202,10 @@ Tu misión es integrar la visión estratégica corporativa con los datos operati
                 recommendations=[sim["cio_recommendation"]]
             )
 
-        elif any(w in q for w in ["inventario", "stock", "almacen", "almacén", "bodega", "existencia", "existencias", "desabasto", "sku"]):
+        elif any(w in q for w in [
+            "inventario", "stock", "almacen", "almacén", "bodega", "bodegas", "existencia", "existencias",
+            "desabasto", "sku", "agotado", "agotados", "reorden", "reabastecer"
+        ]):
             # Delegar al subagente de inventarios y sintetizar
             inv_res = self.inventory_agent.handle_request(user_query, context)
             summary = f"[CIO -> Agente de Inventarios]: {inv_res.summary}"
@@ -215,12 +218,16 @@ Tu misión es integrar la visión estratégica corporativa con los datos operati
             )
 
         elif any(w in q for w in [
-            "venta", "ventas", "comercial", "ingreso", "facturacion", "facturación", "cliente", "pedido",
+            "venta", "ventas", "comercial", "ingreso", "facturacion", "facturación", "cliente", "clientes",
+            "comprador", "compradores", "pedido", "pedidos",
             "cuantas", "cuantos", "cuanta", "cuanto", "cuántas", "cuántos", "cuánta", "cuánto",
-            "vendieron", "vendio", "vendió", "westin", "bombay", "sala", "salas", "sofa", "sofas",
+            "vendieron", "vendio", "vendió", "vendida", "vendidas", "vendido", "vendidos",
+            "westin", "bombay", "sala", "salas", "sofa", "sofas",
             "comedor", "comedores", "mesa", "mesas", "cama", "camas", "mueble", "muebles", "producto", "productos",
             "precio", "precios", "margen", "margenes", "márgenes", "materia prima", "costo", "costos",
-            "rentabilidad", "ganancia", "utilidad"
+            "rentabilidad", "ganancia", "utilidad", "top", "estrella", "mes", "meses",
+            "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+            "ayer", "hoy", "semana"
         ]):
             # Delegar al subagente de ventas y sintetizar
             sales_res = self.sales_agent.handle_request(user_query, context)
