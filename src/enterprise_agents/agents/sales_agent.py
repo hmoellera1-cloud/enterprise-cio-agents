@@ -35,6 +35,7 @@ Tus respuestas son concisas, estructuradas y con enfoque en métricas y cumplimi
         self.register_tool(sales_tools.get_sales_pipeline_insights, "get_sales_pipeline_insights")
         self.register_tool(sales_tools.search_product_sales, "search_product_sales")
         self.register_tool(sales_tools.get_sales_by_date, "get_sales_by_date")
+        self.register_tool(sales_tools.get_margin_analysis, "get_margin_analysis")
 
     def handle_request(self, user_query: str, context: Optional[Dict[str, Any]] = None) -> AgentResponse:
         self.log_message(sender="UserOrCIO", recipient=self.name, content=user_query)
@@ -120,10 +121,12 @@ Tus respuestas son concisas, estructuradas y con enfoque en métricas y cumplimi
         stopwords = {
             "que", "qué", "cual", "cuál", "cuales", "cuáles", "como", "cómo", "cuando", "cuándo", "donde", "dónde",
             "cuantas", "cuantos", "cuanta", "cuanto", "cuántas", "cuántos", "cuánta", "cuánto",
-            "se", "vendieron", "vendio", "vendió", "en", "el", "la", "los", "las",
+            "se", "vendieron", "vendio", "vendió", "en", "el", "la", "los", "las", "y", "o", "es", "son", "tiene",
             "un", "una", "unos", "unas", "de", "del", "por", "favor", "dime", "diga", "mes", "ano", "año", "para",
             "total", "sobre", "ventas", "venta", "pedidos", "ordenes", "órdenes", "informacion", "información",
-            "hay", "buscar", "modelo", "ayer", "hoy", "anteayer", "antier", "dia", "día", "fecha"
+            "hay", "buscar", "modelo", "ayer", "hoy", "anteayer", "antier", "dia", "día", "fecha",
+            "precio", "precios", "margen", "margenes", "márgenes", "materia", "prima", "costo", "costos",
+            "rentabilidad", "ganancia", "utilidad", "bruto", "bruta"
         }
         if found_month:
             stopwords.add(found_month)
@@ -145,13 +148,16 @@ Tus respuestas son concisas, estructuradas y con enfoque en métricas y cumplimi
             period_str = f"en {found_month.capitalize()}" if found_month else "en el período registrado de CTIN"
 
             if result["total_units_sold"] > 0:
+                avg_unit = round(result["total_revenue"] / result["total_units_sold"], 2)
                 summary = (
                     f"Ventas de '{extracted_keyword}' {period_str}: "
-                    f"Se vendieron un total de {result['total_units_sold']} unidades "
-                    f"por un valor de ${result['total_revenue']:,} USD a través de {result['total_variants']} variantes de producto."
+                    f"{result['total_units_sold']} unidades vendidas por ${result['total_revenue']:,} USD "
+                    f"(precio promedio: ${avg_unit:,} USD) en {result['total_variants']} variantes. "
+                    f"Costo materia prima/producción: ${result['total_cost']:,} USD | "
+                    f"Margen bruto: ${result['gross_margin']:,} USD ({result['margin_pct']}%)."
                 )
                 recs = [
-                    f"Variante líder: '{result['variants'][0]['name']}' ({result['variants'][0]['units_sold']} uds vendidas, ${result['variants'][0]['revenue']:,} USD).",
+                    f"Variante líder: '{result['variants'][0]['name']}' ({result['variants'][0]['units_sold']} uds, ${result['variants'][0]['revenue']:,} USD, margen {result['variants'][0]['margin_pct']}%).",
                     "Coordinar con el Director de Inventarios para auditar existencias y órdenes de reposición en bodegas."
                 ]
             else:
@@ -165,6 +171,24 @@ Tus respuestas son concisas, estructuradas y con enfoque en métricas y cumplimi
                 status="success",
                 summary=summary,
                 details={"search_result": result},
+                recommendations=recs
+            )
+
+        elif any(w in q for w in ["margen", "materia prima", "rentabilidad", "ganancia", "utilidad", "costo", "precio"]):
+            margin = self.call_tool("get_margin_analysis", limit=6)
+            summary = (
+                f"Análisis de Márgenes y Costos CTIN: Sobre ventas con costo registrado de ${margin['costed_revenue']:,} USD "
+                f"(facturación total ${margin['total_revenue']:,} USD), el costo de materia prima/producción es ${margin['total_cost']:,} USD, "
+                f"generando un margen bruto de ${margin['gross_margin']:,} USD ({margin['margin_pct']}%)."
+            )
+            recs = [
+                f"Producto de mayor contribución: '{margin['variants'][0]['name']}' (margen ${margin['variants'][0]['gross_margin']:,} USD, {margin['variants'][0]['margin_pct']}%)."
+            ] if margin["variants"] else []
+            resp = AgentResponse(
+                agent_name=self.name,
+                status="success",
+                summary=summary,
+                details={"margin_analysis": margin, "search_result": {"variants": margin["variants"]}},
                 recommendations=recs
             )
 
