@@ -30,6 +30,7 @@ Priorizas la continuidad operativa, minimizando quiebres de stock sin incurrir e
         self.register_tool(inventory_tools.get_stock_by_sku, "get_stock_by_sku")
         self.register_tool(inventory_tools.create_restock_request, "create_restock_request")
         self.register_tool(inventory_tools.check_stock_availability, "check_stock_availability")
+        self.register_tool(inventory_tools.search_inventory_by_keyword, "search_inventory_by_keyword")
 
     def handle_request(self, user_query: str, context: Optional[Dict[str, Any]] = None) -> AgentResponse:
         self.log_message(sender="UserOrCIO", recipient=self.name, content=user_query)
@@ -77,36 +78,84 @@ Priorizas la continuidad operativa, minimizando quiebres de stock sin incurrir e
                 recommendations=recs
             )
 
-        elif any(w in q for w in ["sku", "producto", "especifico", "consultar"]):
-            # Extraer SKU si está en el query (ej: SKU-LAP-PRO16)
+        elif any(w in q for w in ["sku", "producto", "especifico", "consultar"]) or (
+            not any(w in q for w in ["reorden", "reabastecer", "comprar", "pedido proveedor"])
+            and any(w in q for w in ["stock", "inventario", "existencia", "existencias", "cuanto", "cuánto", "cuantos", "cuántos", "hay", "bodega", "almacen", "almacén"])
+        ):
             import re
             sku_match = re.search(r"SKU-[A-Z0-9\-]+", user_query.upper())
-            target_sku = sku_match.group(0) if sku_match else "SKU-LAP-PRO16"
-            stock = self.call_tool("get_stock_by_sku", sku=target_sku)
-            if stock:
-                summary = (
-                    f"Ficha de SKU {target_sku} ({stock['name']}): "
-                    f"Físico: {stock['total_on_hand']} | Reservado: {stock['total_reserved']} | "
-                    f"Disponible: {stock['total_available']} | Mínimo seguridad: {stock['min_safety_stock']}."
-                )
-                recs = [
-                    f"Tiempo de entrega de proveedor: {stock['lead_time_days']} días.",
-                    "Estado: " + ("CRÍTICO" if stock['total_available'] <= stock['min_safety_stock'] else "NORMAL")
-                ]
-                resp = AgentResponse(
-                    agent_name=self.name,
-                    status="success",
-                    summary=summary,
-                    details={"stock": stock},
-                    recommendations=recs
-                )
+            if sku_match:
+                target_sku = sku_match.group(0)
+                stock = self.call_tool("get_stock_by_sku", sku=target_sku)
+                if stock:
+                    summary = (
+                        f"Ficha de SKU {target_sku} ({stock['name']}): "
+                        f"Físico: {stock['total_on_hand']} | Reservado: {stock['total_reserved']} | "
+                        f"Disponible: {stock['total_available']} | Mínimo seguridad: {stock['min_safety_stock']}."
+                    )
+                    recs = [
+                        f"Tiempo de entrega de proveedor: {stock['lead_time_days']} días.",
+                        "Estado: " + ("CRÍTICO" if stock['total_available'] <= stock['min_safety_stock'] else "NORMAL")
+                    ]
+                    resp = AgentResponse(
+                        agent_name=self.name,
+                        status="success",
+                        summary=summary,
+                        details={"stock": stock},
+                        recommendations=recs
+                    )
+                else:
+                    resp = AgentResponse(
+                        agent_name=self.name,
+                        status="error",
+                        summary=f"No se encontró información para el SKU '{target_sku}'.",
+                        recommendations=["Verificar el código de SKU solicitado."]
+                    )
             else:
-                resp = AgentResponse(
-                    agent_name=self.name,
-                    status="error",
-                    summary=f"No se encontró información para el SKU '{target_sku}'.",
-                    recommendations=["Verificar el código de SKU solicitado."]
-                )
+                inv_stop = {
+                    "que", "qué", "cual", "cuál", "cuanto", "cuánto", "cuantos", "cuántos", "cuantas", "cuántas",
+                    "stock", "inventario", "existencia", "existencias", "hay", "tiene", "tienen", "de", "del",
+                    "en", "el", "la", "los", "las", "un", "una", "bodega", "bodegas", "almacen", "almacén",
+                    "consultar", "producto", "sku", "sobre", "por", "favor"
+                }
+                clean_text = "".join(ch if ch.isalnum() or ch.isspace() else " " for ch in q)
+                kw = " ".join(w for w in clean_text.split() if w not in inv_stop).strip()
+                if kw:
+                    inv_res = self.call_tool("search_inventory_by_keyword", keyword=kw)
+                    if inv_res["total_variants"] > 0:
+                        summary = (
+                            f"Inventario de '{kw}' en CTIN ({inv_res['total_variants']} variantes): "
+                            f"Stock físico: {inv_res['total_on_hand']:,} uds | Reservado: {inv_res['total_reserved']:,} uds | "
+                            f"Disponible: {inv_res['total_available']:,} uds (valoración al costo: ${inv_res['total_cost_valuation']:,} USD)."
+                        )
+                        resp = AgentResponse(
+                            agent_name=self.name,
+                            status="success",
+                            summary=summary,
+                            details={"inventory_search": inv_res, "search_result": {"variants": inv_res["variants"]}},
+                            recommendations=["Revisar bodegas con disponibilidad inmediata para despacho."]
+                        )
+                    else:
+                        resp = AgentResponse(
+                            agent_name=self.name,
+                            status="success",
+                            summary=f"No se encontraron existencias en inventario para '{kw}'.",
+                            recommendations=["Verificar el nombre o código SKU en el catálogo de CTIN."]
+                        )
+                else:
+                    kpis = self.call_tool("get_inventory_kpis")
+                    summary = (
+                        f"Inventario Global: {kpis['total_skus']} SKUs activos, "
+                        f"{kpis['total_units_on_hand']:,} unidades físicas (${kpis['total_valuation_cost']:,} coste / ${kpis['total_valuation_retail']:,} venta). "
+                        f"Disponibles: {kpis['total_units_available']:,}."
+                    )
+                    resp = AgentResponse(
+                        agent_name=self.name,
+                        status="success",
+                        summary=summary,
+                        details={"kpis": kpis},
+                        recommendations=[]
+                    )
 
         elif any(w in q for w in ["reorden", "reabastecer", "comprar", "pedido proveedor"]):
             # Disparar solicitudes de reabastecimiento para críticos
