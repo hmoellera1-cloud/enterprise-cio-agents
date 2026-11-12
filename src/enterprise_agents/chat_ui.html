@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="CTIN CIO" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>CTIN · Centro de Consulta CIO</title>
+  <style>
+    :root {
+      --bg: #0b1120;
+      --surface: #111827;
+      --surface-2: #1e293b;
+      --border: #263244;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --user-bubble: #1d4ed8;
+      --bot-bubble: #172033;
+      --success: #10b981;
+      --warning: #f59e0b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      max-width: 900px;
+      margin: 0 auto;
+      background: var(--bg);
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+    }
+
+    @media (max-width: 900px) {
+      .app { border-left: none; border-right: none; }
+    }
+
+    header {
+      padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
+      background: rgba(17, 24, 39, 0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 10;
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #2563eb, #06b6d4);
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      font-size: 14px;
+      letter-spacing: 0.5px;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    .brand-text h1 {
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .brand-text span {
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--success);
+      display: inline-block;
+    }
+
+    .agent-tabs {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .agent-tabs::-webkit-scrollbar { display: none; }
+
+    .tab {
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--muted);
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+
+    .tab.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      scroll-behavior: smooth;
+    }
+
+    .msg {
+      display: flex;
+      flex-direction: column;
+      max-width: 86%;
+      gap: 6px;
+      animation: fadeIn 0.18s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .msg.user {
+      align-self: flex-end;
+      align-items: flex-end;
+    }
+
+    .msg.bot {
+      align-self: flex-start;
+      align-items: flex-start;
+    }
+
+    .bubble {
+      padding: 12px 14px;
+      border-radius: 16px;
+      font-size: 14.5px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .msg.user .bubble {
+      background: var(--user-bubble);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+
+    .msg.bot .bubble {
+      background: var(--bot-bubble);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-bottom-left-radius: 4px;
+    }
+
+    .agent-badge {
+      font-size: 11px;
+      font-weight: 600;
+      color: #60a5fa;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      padding-left: 4px;
+    }
+
+    .details-box {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+      font-size: 12.5px;
+      color: var(--muted);
+    }
+
+    .variant-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .variant-item {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 7px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .variant-name {
+      color: var(--text);
+      font-weight: 500;
+      font-size: 12px;
+    }
+
+    .variant-meta {
+      color: #34d399;
+      font-weight: 600;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .quick-chips {
+      padding: 8px 16px 4px;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      border-top: 1px solid rgba(38, 50, 68, 0.5);
+      background: var(--surface);
+    }
+    .quick-chips::-webkit-scrollbar { display: none; }
+
+    .chip {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 11px;
+      border-radius: 999px;
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .chip:hover { background: #293548; }
+
+    .composer {
+      padding: 10px 16px calc(12px + env(safe-area-inset-bottom));
+      background: var(--surface);
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    textarea {
+      flex: 1;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      color: var(--text);
+      padding: 11px 14px;
+      font-size: 15px;
+      font-family: inherit;
+      resize: none;
+      max-height: 120px;
+      min-height: 44px;
+      line-height: 1.35;
+      outline: none;
+    }
+
+    textarea:focus { border-color: var(--accent); }
+
+    button.send-btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      height: 44px;
+      padding: 0 18px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+
+    button.send-btn:hover { background: var(--accent-hover); }
+    button.send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .typing {
+      font-size: 13px;
+      color: var(--muted);
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="header-top">
+        <div class="brand">
+          <div class="logo">CTIN</div>
+          <div class="brand-text">
+            <h1>Centro de Consulta CIO</h1>
+            <span><i class="dot"></i> Conectado a datos reales ($ USD)</span>
+          </div>
+        </div>
+      </div>
+      <div class="agent-tabs" id="agentTabs">
+        <button class="tab active" data-endpoint="/api/cio/chat" data-label="CIO (Orquestador)">👔 CIO (General)</button>
+        <button class="tab" data-endpoint="/api/sales/chat" data-label="Agente de Ventas">📈 Ventas</button>
+        <button class="tab" data-endpoint="/api/inventory/chat" data-label="Agente de Inventarios">📦 Inventarios</button>
+      </div>
+    </header>
+
+    <main class="messages" id="messages">
+      <div class="msg bot">
+        <span class="agent-badge">CIO - CTIN</span>
+        <div class="bubble">Hola. Soy el Director de Información (CIO) de CTIN. Puedes consultarme sobre ventas por producto o mes, KPIs comerciales, estado de inventarios o solicitar un informe ejecutivo.</div>
+      </div>
+    </main>
+
+    <div class="quick-chips">
+      <button class="chip" data-q="¿Cuántas salas westin se vendieron en octubre?">Salas Westin (Octubre)</button>
+      <button class="chip" data-q="salas bombay">Salas Bombay</button>
+      <button class="chip" data-q="Resumen general de ventas">Resumen de Ventas</button>
+      <button class="chip" data-q="Alertas críticas de inventario">Stock Crítico</button>
+      <button class="chip" data-q="Informe ejecutivo del CIO">Informe Ejecutivo</button>
+    </div>
+
+    <form class="composer" id="chatForm">
+      <textarea id="queryInput" rows="1" placeholder="Escribe tu consulta para CTIN..." autocomplete="off"></textarea>
+      <button type="submit" class="send-btn" id="sendBtn">Enviar</button>
+    </form>
+  </div>
+
+  <script>
+    const messagesEl = document.getElementById("messages");
+    const formEl = document.getElementById("chatForm");
+    const inputEl = document.getElementById("queryInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const tabs = document.querySelectorAll(".tab");
+
+    let currentEndpoint = "/api/cio/chat";
+    let currentLabel = "CIO - CTIN";
+
+    tabs.forEach(tab => {
+      tab.addEventListener("click", () => {
+        tabs.forEach(t => t.classList.remove("active"));
+        tab.classList.add("active");
+        currentEndpoint = tab.dataset.endpoint;
+        currentLabel = tab.dataset.label;
+      });
+    });
+
+    document.querySelectorAll(".chip").forEach(chip => {
+      chip.addEventListener("click", () => {
+        inputEl.value = chip.dataset.q;
+        sendQuery(chip.dataset.q);
+      });
+    });
+
+    inputEl.addEventListener("input", () => {
+      inputEl.style.height = "auto";
+      inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + "px";
+    });
+
+    inputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        formEl.dispatchEvent(new Event("submit"));
+      }
+    });
+
+    formEl.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const text = inputEl.value.trim();
+      if (!text) return;
+      sendQuery(text);
+    });
+
+    function appendMessage(role, text, badge = "", details = null) {
+      const wrap = document.createElement("div");
+      wrap.className = `msg ${role}`;
+
+      if (role === "bot" && badge) {
+        const b = document.createElement("span");
+        b.className = "agent-badge";
+        b.textContent = badge;
+        wrap.appendChild(b);
+      }
+
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      bubble.textContent = text;
+
+      // Renderizar desglose compacto si viene búsqueda de variantes
+      const searchResult = details?.search_result || details?.response?.details?.search_result;
+      if (searchResult && Array.isArray(searchResult.variants) && searchResult.variants.length > 0) {
+        const box = document.createElement("div");
+        box.className = "details-box";
+        box.innerHTML = `<strong>Desglose por variante (top ${Math.min(searchResult.variants.length, 6)}):</strong>`;
+        const list = document.createElement("div");
+        list.className = "variant-list";
+        searchResult.variants.slice(0, 6).forEach(v => {
+          const item = document.createElement("div");
+          item.className = "variant-item";
+          const nameSpan = document.createElement("span");
+          nameSpan.className = "variant-name";
+          nameSpan.textContent = v.name;
+          const metaSpan = document.createElement("span");
+          metaSpan.className = "variant-meta";
+          metaSpan.textContent = `${v.units_sold} uds · $${Number(v.revenue).toLocaleString("en-US")}`;
+          item.appendChild(nameSpan);
+          item.appendChild(metaSpan);
+          list.appendChild(item);
+        });
+        box.appendChild(list);
+        bubble.appendChild(box);
+      }
+
+      wrap.appendChild(bubble);
+      messagesEl.appendChild(wrap);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      return wrap;
+    }
+
+    async function sendQuery(query) {
+      appendMessage("user", query);
+      inputEl.value = "";
+      inputEl.style.height = "auto";
+      sendBtn.disabled = true;
+
+      const loadingEl = appendMessage("bot", "Consultando base de datos de CTIN...", currentLabel);
+      loadingEl.querySelector(".bubble").classList.add("typing");
+
+      try {
+        const res = await fetch(currentEndpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query })
+        });
+        const data = await res.json();
+        loadingEl.remove();
+
+        if (!res.ok) {
+          appendMessage("bot", `Error ${res.status}: ${data.detail || "No se pudo procesar la consulta."}`, currentLabel);
+        } else {
+          appendMessage("bot", data.summary || JSON.stringify(data), data.agent_name || currentLabel, data.details);
+        }
+      } catch (err) {
+        loadingEl.remove();
+        appendMessage("bot", "No se pudo conectar con el servidor. Si estaba en reposo, intenta nuevamente en unos segundos.", currentLabel);
+      } finally {
+        sendBtn.disabled = false;
+        inputEl.focus();
+      }
+    }
+  </script>
+</body>
+</html>
