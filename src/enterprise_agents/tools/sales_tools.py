@@ -210,3 +210,82 @@ def search_product_sales(keyword: str, month: Optional[str] = None) -> Dict[str,
         ]
     }
 
+
+def get_sales_by_date(target_date: str) -> Dict[str, Any]:
+    """Obtiene el resumen de ventas y productos vendidos en una fecha específica (YYYY-MM-DD)."""
+    rows = query_db("""
+        SELECT 
+            p.sku,
+            p.name,
+            SUM(oi.quantity) as total_qty,
+            SUM(oi.subtotal) as total_revenue,
+            COUNT(DISTINCT so.id) as orders_count
+        FROM order_items oi
+        JOIN sales_orders so ON oi.order_id = so.id
+        JOIN products p ON oi.product_id = p.id
+        WHERE so.order_date LIKE ?
+        GROUP BY p.id
+        ORDER BY total_revenue DESC
+    """, (f"{target_date}%",))
+
+    orders_row = query_db("""
+        SELECT COUNT(*) as orders_count, COALESCE(SUM(total_amount), 0) as total_rev
+        FROM sales_orders
+        WHERE order_date LIKE ?
+    """, (f"{target_date}%",))[0]
+
+    max_date_row = query_db("SELECT MAX(order_date) as max_date FROM sales_orders")[0]
+    latest_date = max_date_row["max_date"] if max_date_row else None
+
+    latest_summary = None
+    if not rows and latest_date:
+        latest_orders = query_db("""
+            SELECT COUNT(*) as orders_count, COALESCE(SUM(total_amount), 0) as total_rev
+            FROM sales_orders
+            WHERE order_date = ?
+        """, (latest_date,))[0]
+        latest_items = query_db("""
+            SELECT p.sku, p.name, SUM(oi.quantity) as total_qty, SUM(oi.subtotal) as total_revenue
+            FROM order_items oi
+            JOIN sales_orders so ON oi.order_id = so.id
+            JOIN products p ON oi.product_id = p.id
+            WHERE so.order_date = ?
+            GROUP BY p.id
+            ORDER BY total_revenue DESC
+            LIMIT 6
+        """, (latest_date,))
+        latest_summary = {
+            "date": latest_date,
+            "orders_count": int(latest_orders["orders_count"]),
+            "total_revenue": round(latest_orders["total_rev"], 2),
+            "total_units_sold": sum(int(i["total_qty"]) for i in latest_items),
+            "variants": [
+                {
+                    "sku": i["sku"],
+                    "name": i["name"],
+                    "units_sold": int(i["total_qty"]),
+                    "revenue": round(i["total_revenue"], 2)
+                }
+                for i in latest_items
+            ]
+        }
+
+    return {
+        "target_date": target_date,
+        "orders_count": int(orders_row["orders_count"]),
+        "total_units_sold": sum(int(r["total_qty"]) for r in rows),
+        "total_revenue": round(orders_row["total_rev"], 2),
+        "variants": [
+            {
+                "sku": r["sku"],
+                "name": r["name"],
+                "units_sold": int(r["total_qty"]),
+                "revenue": round(r["total_revenue"], 2),
+                "orders_count": r["orders_count"]
+            }
+            for r in rows
+        ],
+        "latest_available": latest_summary
+    }
+
+
