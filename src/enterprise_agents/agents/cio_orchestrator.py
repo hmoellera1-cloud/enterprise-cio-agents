@@ -202,7 +202,7 @@ Tu misión es integrar la visión estratégica corporativa con los datos operati
                 recommendations=[sim["cio_recommendation"]]
             )
 
-        elif any(w in q for w in ["inventario", "stock", "almacen", "desabasto", "sku"]):
+        elif any(w in q for w in ["inventario", "stock", "almacen", "almacén", "bodega", "existencia", "existencias", "desabasto", "sku"]):
             # Delegar al subagente de inventarios y sintetizar
             inv_res = self.inventory_agent.handle_request(user_query, context)
             summary = f"[CIO -> Agente de Inventarios]: {inv_res.summary}"
@@ -218,7 +218,9 @@ Tu misión es integrar la visión estratégica corporativa con los datos operati
             "venta", "ventas", "comercial", "ingreso", "facturacion", "facturación", "cliente", "pedido",
             "cuantas", "cuantos", "cuanta", "cuanto", "cuántas", "cuántos", "cuánta", "cuánto",
             "vendieron", "vendio", "vendió", "westin", "bombay", "sala", "salas", "sofa", "sofas",
-            "comedor", "comedores", "mesa", "mesas", "cama", "camas", "mueble", "muebles", "producto", "productos"
+            "comedor", "comedores", "mesa", "mesas", "cama", "camas", "mueble", "muebles", "producto", "productos",
+            "precio", "precios", "margen", "margenes", "márgenes", "materia prima", "costo", "costos",
+            "rentabilidad", "ganancia", "utilidad"
         ]):
             # Delegar al subagente de ventas y sintetizar
             sales_res = self.sales_agent.handle_request(user_query, context)
