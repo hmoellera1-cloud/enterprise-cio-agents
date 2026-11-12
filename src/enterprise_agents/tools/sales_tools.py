@@ -156,8 +156,11 @@ def search_product_sales(keyword: str, month: Optional[str] = None) -> Dict[str,
             SELECT 
                 p.sku,
                 p.name,
+                p.cost_price,
+                p.sale_price,
                 SUM(oi.quantity) as total_qty,
                 SUM(oi.subtotal) as total_revenue,
+                SUM(oi.quantity * p.cost_price) as total_cost,
                 AVG(oi.unit_price) as avg_price,
                 COUNT(DISTINCT so.id) as orders_count
             FROM order_items oi
@@ -175,8 +178,11 @@ def search_product_sales(keyword: str, month: Optional[str] = None) -> Dict[str,
             SELECT 
                 p.sku,
                 p.name,
+                p.cost_price,
+                p.sale_price,
                 SUM(oi.quantity) as total_qty,
                 SUM(oi.subtotal) as total_revenue,
+                SUM(oi.quantity * p.cost_price) as total_cost,
                 AVG(oi.unit_price) as avg_price,
                 COUNT(DISTINCT so.id) as orders_count
             FROM order_items oi
@@ -190,24 +196,40 @@ def search_product_sales(keyword: str, month: Optional[str] = None) -> Dict[str,
 
     total_units = sum(r["total_qty"] for r in rows)
     total_revenue = sum(r["total_revenue"] for r in rows)
+    total_cost = sum(r["total_cost"] or 0 for r in rows)
+    gross_margin = total_revenue - total_cost
+    margin_pct = round((gross_margin / total_revenue) * 100, 1) if total_revenue > 0 else 0.0
+
+    variants_out = []
+    for r in rows:
+        rev = round(r["total_revenue"], 2)
+        cost = round(r["total_cost"] or 0, 2)
+        gm = round(rev - cost, 2)
+        mpct = round((gm / rev) * 100, 1) if rev > 0 else 0.0
+        variants_out.append({
+            "sku": r["sku"],
+            "name": r["name"],
+            "units_sold": int(r["total_qty"]),
+            "revenue": rev,
+            "cost_price": round(r["cost_price"], 2),
+            "sale_price": round(r["sale_price"], 2),
+            "avg_price": round(r["avg_price"], 2),
+            "total_cost": cost,
+            "gross_margin": gm,
+            "margin_pct": mpct,
+            "orders_count": r["orders_count"]
+        })
 
     return {
         "keyword": keyword,
         "month": month,
         "total_units_sold": int(total_units),
         "total_revenue": round(total_revenue, 2),
+        "total_cost": round(total_cost, 2),
+        "gross_margin": round(gross_margin, 2),
+        "margin_pct": margin_pct,
         "total_variants": len(rows),
-        "variants": [
-            {
-                "sku": r["sku"],
-                "name": r["name"],
-                "units_sold": int(r["total_qty"]),
-                "revenue": round(r["total_revenue"], 2),
-                "avg_price": round(r["avg_price"], 2),
-                "orders_count": r["orders_count"]
-            }
-            for r in rows
-        ]
+        "variants": variants_out
     }
 
 
@@ -287,5 +309,67 @@ def get_sales_by_date(target_date: str) -> Dict[str, Any]:
         ],
         "latest_available": latest_summary
     }
+
+
+def get_margin_analysis(limit: int = 6) -> Dict[str, Any]:
+    """Analiza ingresos, costo de materia prima/producción y margen bruto global y por producto."""
+    totals = query_db("""
+        SELECT 
+            COALESCE(SUM(oi.subtotal), 0) as total_revenue,
+            COALESCE(SUM(CASE WHEN p.cost_price > 0 THEN oi.subtotal ELSE 0 END), 0) as costed_revenue,
+            COALESCE(SUM(CASE WHEN p.cost_price > 0 THEN oi.quantity * p.cost_price ELSE 0 END), 0) as total_cost
+        FROM order_items oi
+        JOIN products p ON oi.product_id = p.id
+    """)[0]
+
+    costed_rev = totals["costed_revenue"]
+    total_cost = totals["total_cost"]
+    gross_margin = costed_rev - total_cost
+    margin_pct = round((gross_margin / costed_rev) * 100, 1) if costed_rev > 0 else 0.0
+
+    top_margin_rows = query_db("""
+        SELECT 
+            p.sku,
+            p.name,
+            p.cost_price,
+            AVG(oi.unit_price) as avg_price,
+            SUM(oi.quantity) as units_sold,
+            SUM(oi.subtotal) as revenue,
+            SUM(oi.quantity * p.cost_price) as cost
+        FROM order_items oi
+        JOIN products p ON oi.product_id = p.id
+        WHERE p.cost_price > 0
+        GROUP BY p.id
+        ORDER BY (SUM(oi.subtotal) - SUM(oi.quantity * p.cost_price)) DESC
+        LIMIT ?
+    """, (limit,))
+
+    variants = []
+    for r in top_margin_rows:
+        rev = round(r["revenue"], 2)
+        cost = round(r["cost"], 2)
+        gm = round(rev - cost, 2)
+        mpct = round((gm / rev) * 100, 1) if rev > 0 else 0.0
+        variants.append({
+            "sku": r["sku"],
+            "name": r["name"],
+            "units_sold": int(r["units_sold"]),
+            "avg_price": round(r["avg_price"], 2),
+            "cost_price": round(r["cost_price"], 2),
+            "revenue": rev,
+            "total_cost": cost,
+            "gross_margin": gm,
+            "margin_pct": mpct
+        })
+
+    return {
+        "total_revenue": round(totals["total_revenue"], 2),
+        "costed_revenue": round(costed_rev, 2),
+        "total_cost": round(total_cost, 2),
+        "gross_margin": round(gross_margin, 2),
+        "margin_pct": margin_pct,
+        "variants": variants
+    }
+
 
 
