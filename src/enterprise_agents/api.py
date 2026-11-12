@@ -4,8 +4,10 @@ Servicio API REST con FastAPI para interactuar con el CIO y los agentes de Venta
 """
 
 from __future__ import annotations
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from enterprise_agents.database import init_database
 from enterprise_agents.agents.cio_orchestrator import CIOAgent
@@ -50,6 +52,7 @@ def root():
             {"name": inventory_agent.name, "role": inventory_agent.role},
         ],
         "endpoints": {
+            "chat_ui": "/chat",
             "executive_briefing": "/api/cio/executive-report",
             "chat_cio": "/api/cio/chat",
             "chat_sales": "/api/sales/chat",
@@ -57,6 +60,13 @@ def root():
             "simulate_deal": "/api/simulate-deal"
         }
     }
+
+
+@app.get("/chat", response_class=HTMLResponse)
+def chat_ui():
+    """Interfaz web responsiva de consulta para iPhone y escritorio."""
+    html_path = Path(__file__).parent / "chat_ui.html"
+    return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
 
 
 @app.get("/api/cio/executive-report", response_model=ExecutiveBriefing)
