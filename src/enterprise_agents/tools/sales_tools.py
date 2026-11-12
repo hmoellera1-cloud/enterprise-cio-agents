@@ -372,4 +372,156 @@ def get_margin_analysis(limit: int = 6) -> Dict[str, Any]:
     }
 
 
+def get_sales_by_month(month: Optional[str] = None) -> Dict[str, Any]:
+    """Obtiene ventas consolidadas por mes o el detalle completo de un mes específico."""
+    month_map = {
+        "enero": "-01-", "febrero": "-02-", "marzo": "-03-", "abril": "-04-",
+        "mayo": "-05-", "junio": "-06-", "julio": "-07-", "agosto": "-08-",
+        "septiembre": "-09-", "octubre": "-10-", "noviembre": "-11-", "diciembre": "-12-"
+    }
+    if month:
+        m_lower = month.lower().strip()
+        date_filter = f"%{month_map.get(m_lower, f'-{m_lower.zfill(2)}-')}%"
+        totals = query_db("""
+            SELECT COUNT(*) as orders_count, COALESCE(SUM(total_amount), 0) as total_rev
+            FROM sales_orders
+            WHERE order_date LIKE ?
+        """, (date_filter,))[0]
+        top_items = query_db("""
+            SELECT 
+                p.sku, p.name, p.cost_price,
+                SUM(oi.quantity) as units_sold,
+                SUM(oi.subtotal) as revenue,
+                SUM(oi.quantity * p.cost_price) as total_cost
+            FROM order_items oi
+            JOIN sales_orders so ON oi.order_id = so.id
+            JOIN products p ON oi.product_id = p.id
+            WHERE so.order_date LIKE ?
+            GROUP BY p.id
+            ORDER BY revenue DESC
+            LIMIT 8
+        """, (date_filter,))
+        total_units = query_db("""
+            SELECT COALESCE(SUM(oi.quantity), 0) as u, COALESCE(SUM(oi.quantity * p.cost_price), 0) as c
+            FROM order_items oi
+            JOIN sales_orders so ON oi.order_id = so.id
+            JOIN products p ON oi.product_id = p.id
+            WHERE so.order_date LIKE ?
+        """, (date_filter,))[0]
+        rev = round(totals["total_rev"], 2)
+        cost = round(total_units["c"] or 0, 2)
+        gm = round(rev - cost, 2)
+        mpct = round((gm / rev) * 100, 1) if rev > 0 else 0.0
+        return {
+            "month": month,
+            "orders_count": int(totals["orders_count"]),
+            "total_units_sold": int(total_units["u"]),
+            "total_revenue": rev,
+            "total_cost": cost,
+            "gross_margin": gm,
+            "margin_pct": mpct,
+            "variants": [
+                {
+                    "sku": r["sku"],
+                    "name": r["name"],
+                    "units_sold": int(r["units_sold"]),
+                    "revenue": round(r["revenue"], 2),
+                }
+                for r in top_items
+            ]
+        }
+
+    # Resumen de todos los meses
+    rows = query_db("""
+        SELECT 
+            SUBSTR(so.order_date, 1, 7) as ym,
+            COUNT(DISTINCT so.id) as orders_count,
+            COALESCE(SUM(so.total_amount), 0) as total_rev
+        FROM sales_orders so
+        GROUP BY ym
+        ORDER BY ym ASC
+    """)
+    return {
+        "month": None,
+        "months": [
+            {
+                "sku": r["ym"],
+                "name": f"Mes {r['ym']}",
+                "units_sold": int(r["orders_count"]),
+                "revenue": round(r["total_rev"], 2),
+            }
+            for r in rows
+        ]
+    }
+
+
+def get_top_customers(limit: int = 10) -> List[Dict[str, Any]]:
+    """Obtiene los clientes con mayor facturación y número de pedidos."""
+    rows = query_db("""
+        SELECT 
+            c.id,
+            c.company_name,
+            c.segment,
+            c.region,
+            COUNT(so.id) as orders_count,
+            COALESCE(SUM(so.total_amount), 0) as total_revenue
+        FROM customers c
+        JOIN sales_orders so ON c.id = so.customer_id
+        GROUP BY c.id
+        ORDER BY total_revenue DESC
+        LIMIT ?
+    """, (limit,))
+    return [
+        {
+            "sku": f"CLI-{r['id']}",
+            "name": f"{r['company_name']} ({r['region']})",
+            "units_sold": int(r["orders_count"]),
+            "revenue": round(r["total_revenue"], 2),
+        }
+        for r in rows
+    ]
+
+
+def get_sales_by_date_range(start_date: str, end_date: str) -> Dict[str, Any]:
+    """Obtiene ventas en un rango de fechas (YYYY-MM-DD a YYYY-MM-DD)."""
+    totals = query_db("""
+        SELECT COUNT(*) as orders_count, COALESCE(SUM(total_amount), 0) as total_rev
+        FROM sales_orders
+        WHERE order_date >= ? AND order_date <= ?
+    """, (start_date, end_date))[0]
+
+    rows = query_db("""
+        SELECT p.sku, p.name, SUM(oi.quantity) as units_sold, SUM(oi.subtotal) as revenue
+        FROM order_items oi
+        JOIN sales_orders so ON oi.order_id = so.id
+        JOIN products p ON oi.product_id = p.id
+        WHERE so.order_date >= ? AND so.order_date <= ?
+        GROUP BY p.id
+        ORDER BY revenue DESC
+        LIMIT 8
+    """, (start_date, end_date))
+
+    max_date_row = query_db("SELECT MAX(order_date) as max_date FROM sales_orders")[0]
+    latest_date = max_date_row["max_date"] if max_date_row else None
+
+    return {
+        "start_date": start_date,
+        "end_date": end_date,
+        "orders_count": int(totals["orders_count"]),
+        "total_units_sold": sum(int(r["units_sold"]) for r in rows),
+        "total_revenue": round(totals["total_rev"], 2),
+        "latest_date": latest_date,
+        "variants": [
+            {
+                "sku": r["sku"],
+                "name": r["name"],
+                "units_sold": int(r["units_sold"]),
+                "revenue": round(r["revenue"], 2),
+            }
+            for r in rows
+        ]
+    }
+
+
+
 
