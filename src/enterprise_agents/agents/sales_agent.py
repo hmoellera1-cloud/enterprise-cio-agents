@@ -4,6 +4,8 @@ Agente especialista en gestión, auditoría y análisis de información de venta
 """
 
 from __future__ import annotations
+import datetime
+import re
 from typing import Any, Dict, List, Optional
 from enterprise_agents.agents.base_agent import BaseAgent
 from enterprise_agents.models import AgentResponse
@@ -32,10 +34,77 @@ Tus respuestas son concisas, estructuradas y con enfoque en métricas y cumplimi
         self.register_tool(sales_tools.get_recent_orders, "get_recent_orders")
         self.register_tool(sales_tools.get_sales_pipeline_insights, "get_sales_pipeline_insights")
         self.register_tool(sales_tools.search_product_sales, "search_product_sales")
+        self.register_tool(sales_tools.get_sales_by_date, "get_sales_by_date")
 
     def handle_request(self, user_query: str, context: Optional[Dict[str, Any]] = None) -> AgentResponse:
         self.log_message(sender="UserOrCIO", recipient=self.name, content=user_query)
         q = user_query.lower()
+
+        # 0. Consultas por fecha (ayer, hoy, anteayer, fecha YYYY-MM-DD, última fecha)
+        explicit_date_match = re.search(r"\b(20\d{2}-\d{2}-\d{2})\b", q)
+        date_keywords = ["ayer", "hoy", "anteayer", "antier", "ultima fecha", "última fecha", "ultimo dia", "último día"]
+        if explicit_date_match or any(w in q for w in date_keywords):
+            today = datetime.date.today()
+            if explicit_date_match:
+                target_date = explicit_date_match.group(1)
+                date_label = target_date
+            elif "anteayer" in q or "antier" in q:
+                target_date = (today - datetime.timedelta(days=2)).isoformat()
+                date_label = f"anteayer ({target_date})"
+            elif "ayer" in q:
+                target_date = (today - datetime.timedelta(days=1)).isoformat()
+                date_label = f"ayer ({target_date})"
+            elif "hoy" in q:
+                target_date = today.isoformat()
+                date_label = f"hoy ({target_date})"
+            else:
+                # última fecha disponible
+                target_date = "LATEST"
+                date_label = "la última fecha disponible"
+
+            if target_date == "LATEST":
+                probe = self.call_tool("get_sales_by_date", target_date="9999-12-31")
+                latest = probe.get("latest_available")
+                if latest:
+                    summary = (
+                        f"Última fecha con ventas sincronizadas en CTIN ({latest['date']}): "
+                        f"{latest['orders_count']} pedidos por ${latest['total_revenue']:,} USD "
+                        f"({latest['total_units_sold']} unidades en los productos principales)."
+                    )
+                    details = {"search_result": {"variants": latest["variants"]}}
+                else:
+                    summary = "No hay ventas registradas en la base de datos de CTIN."
+                    details = {}
+            else:
+                date_res = self.call_tool("get_sales_by_date", target_date=target_date)
+                if date_res["orders_count"] > 0:
+                    summary = (
+                        f"Ventas de {date_label}: {date_res['orders_count']} pedidos, "
+                        f"{date_res['total_units_sold']} unidades vendidas por un total de ${date_res['total_revenue']:,} USD."
+                    )
+                    details = {"search_result": {"variants": date_res["variants"]}}
+                else:
+                    latest = date_res.get("latest_available")
+                    if latest:
+                        summary = (
+                            f"No hay ventas registradas para {date_label}. "
+                            f"La última fecha sincronizada en la base de datos de CTIN es {latest['date']}, "
+                            f"donde se registraron {latest['orders_count']} pedidos por ${latest['total_revenue']:,} USD."
+                        )
+                        details = {"search_result": {"variants": latest["variants"]}}
+                    else:
+                        summary = f"No hay ventas registradas para {date_label}."
+                        details = {}
+
+            resp = AgentResponse(
+                agent_name=self.name,
+                status="success",
+                summary=summary,
+                details=details,
+                recommendations=["Consultar por mes (ej. 'octubre') o por producto específico para mayor detalle."]
+            )
+            self.log_message(sender=self.name, recipient="UserOrCIO", content=resp.summary)
+            return resp
 
         # Detección de mes si aplica
         months = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
@@ -49,11 +118,12 @@ Tus respuestas son concisas, estructuradas y con enfoque en métricas y cumplimi
         is_search = any(w in q for w in search_indicators) or ("venta de " in q or "ventas de " in q)
 
         stopwords = {
+            "que", "qué", "cual", "cuál", "cuales", "cuáles", "como", "cómo", "cuando", "cuándo", "donde", "dónde",
             "cuantas", "cuantos", "cuanta", "cuanto", "cuántas", "cuántos", "cuánta", "cuánto",
             "se", "vendieron", "vendio", "vendió", "en", "el", "la", "los", "las",
             "un", "una", "unos", "unas", "de", "del", "por", "favor", "dime", "diga", "mes", "ano", "año", "para",
             "total", "sobre", "ventas", "venta", "pedidos", "ordenes", "órdenes", "informacion", "información",
-            "hay", "buscar", "modelo"
+            "hay", "buscar", "modelo", "ayer", "hoy", "anteayer", "antier", "dia", "día", "fecha"
         }
         if found_month:
             stopwords.add(found_month)
