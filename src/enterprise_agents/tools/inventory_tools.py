@@ -211,3 +211,62 @@ def check_stock_availability(items: List[Dict[str, Any]]) -> Dict[str, Any]:
         "all_items_sufficient": all_sufficient,
         "items": results
     }
+
+
+def search_inventory_by_keyword(keyword: str) -> Dict[str, Any]:
+    """Busca existencias en inventario por nombre de producto o código SKU (con normalización de plurales)."""
+    clean_kw = keyword.lower().strip()
+    words = [w for w in clean_kw.split() if len(w) > 1]
+    norm_words = [w[:-1] if w.endswith('s') and len(w) > 3 else w for w in words]
+    if not norm_words:
+        norm_words = [clean_kw]
+
+    conds = " AND ".join(["(LOWER(p.name) LIKE ? OR LOWER(p.sku) LIKE ?)" for _ in norm_words])
+    params = []
+    for w in norm_words:
+        params.extend([f"%{w}%", f"%{w}%"])
+
+    rows = query_db(f"""
+        SELECT 
+            p.sku,
+            p.name,
+            p.cost_price,
+            p.sale_price,
+            COALESCE(SUM(i.quantity_on_hand), 0) as on_hand,
+            COALESCE(SUM(i.quantity_reserved), 0) as reserved,
+            COALESCE(SUM(i.quantity_on_hand - i.quantity_reserved), 0) as available
+        FROM products p
+        LEFT JOIN inventory i ON p.id = i.product_id
+        WHERE {conds}
+        GROUP BY p.id
+        ORDER BY on_hand DESC, p.name ASC
+        LIMIT 25
+    """, tuple(params))
+
+    total_on_hand = sum(int(r["on_hand"]) for r in rows)
+    total_reserved = sum(int(r["reserved"]) for r in rows)
+    total_available = sum(int(r["available"]) for r in rows)
+    total_cost_val = sum((r["on_hand"] or 0) * (r["cost_price"] or 0) for r in rows)
+
+    return {
+        "keyword": keyword,
+        "total_variants": len(rows),
+        "total_on_hand": total_on_hand,
+        "total_reserved": total_reserved,
+        "total_available": total_available,
+        "total_cost_valuation": round(total_cost_val, 2),
+        "variants": [
+            {
+                "sku": r["sku"],
+                "name": r["name"],
+                "units_sold": int(r["available"]),
+                "revenue": round((r["available"] or 0) * (r["sale_price"] or 0), 2),
+                "on_hand": int(r["on_hand"]),
+                "reserved": int(r["reserved"]),
+                "available": int(r["available"]),
+                "cost_price": round(r["cost_price"] or 0, 2),
+                "sale_price": round(r["sale_price"] or 0, 2)
+            }
+            for r in rows
+        ]
+    }
